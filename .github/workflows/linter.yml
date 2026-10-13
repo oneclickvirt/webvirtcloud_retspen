@@ -18,23 +18,31 @@ jobs:
         sudo apt-get install -y --no-install-recommends python3-virtualenv libvirt-dev python3-lxml zlib1g-dev libxslt1-dev libsasl2-dev libldap2-dev pkg-config
     - name: Install dependencies
       run: |
+        set -euo pipefail
         python3 -m venv "$RUNNER_TEMP/webvirtcloud-python"
         "$RUNNER_TEMP/webvirtcloud-python/bin/python" -m pip install --upgrade pip wheel
-        if [[ -f dev/requirements.txt ]]; then requirements=dev/requirements.txt; else requirements=conf/requirements.txt; fi
-        "$RUNNER_TEMP/webvirtcloud-python/bin/pip" install -r "$requirements"
+        "$RUNNER_TEMP/webvirtcloud-python/bin/pip" install -r conf/requirements.txt pip-audit
+        "$RUNNER_TEMP/webvirtcloud-python/bin/python" -m pip check
+    - name: Validate application dependency compatibility
+      shell: bash
+      run: |
+        set -euo pipefail
+        "$RUNNER_TEMP/webvirtcloud-python/bin/python" .github/tests/application_smoke.py
+    - name: Audit runtime dependencies
+      shell: bash
+      run: |
+        set -euo pipefail
+        "$RUNNER_TEMP/webvirtcloud-python/bin/python" -m pip_audit -r conf/requirements.txt --progress-spinner off --timeout 45
     - name: Lint Code Base
       uses: super-linter/super-linter@2da136927bd4a73596db63044b504547c62cb854
       env:
         FILTER_REGEX_EXCLUDE: .*(static|scss|venv|locale)/.*
         DEFAULT_BRANCH: master
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        VALIDATE_ALL_CODEBASE: false
-        VALIDATE_PYTHON_MYPY: false
-        VALIDATE_PYTHON_BLACK: false
-        VALIDATE_PYTHON_FLAKE8: false
-        VALIDATE_PYTHON_PYINK: false
-        VALIDATE_PYTHON_PYLINT: false
-        VALIDATE_PYTHON_ISORT: false
+        VALIDATE_ALL_CODEBASE: true
+        VALIDATE_GITHUB_ACTIONS: true
+        VALIDATE_PYTHON_FLAKE8: true
+    timeout-minutes: 25
 'on':
   push:
     branches:
@@ -46,3 +54,10 @@ jobs:
 permissions:
   contents: read
   statuses: write
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+  PIP_DEFAULT_TIMEOUT: '45'
+  PIP_RETRIES: '3'
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
