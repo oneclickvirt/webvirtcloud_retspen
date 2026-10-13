@@ -122,7 +122,6 @@ def set_winsize(fd, row, col, xpix=0, ypix=0):
 
 
 def read_and_forward_pty_output():
-    global fd
     max_read_bytes = 1024 * 20
     while True:
         sio.sleep(0.01)
@@ -138,14 +137,12 @@ def read_and_forward_pty_output():
 
 @sio.event
 def resize(sid, message):
-    global fd
     if fd:
         set_winsize(fd, message["rows"], message["cols"])
 
 
 @sio.event
 def pty_input(sid, message):
-    global fd
     if fd:
         os.write(fd, message["input"].encode())
 
